@@ -1,0 +1,32 @@
+version: "3.8"
+
+services:
+  app1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: nextjs-app1
+    restart: unless-stopped
+    expose:
+      - "3000"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.app1.rule=Host(`rnd.so`)"
+      - "traefik.http.routers.app1.entrypoints=websecure"
+      - "traefik.http.routers.app1.tls.certresolver=letsencrypt"
+      - "traefik.http.services.app1.loadbalancer.server.port=3000"
+    environment:
+      NODE_ENV: production
+      REDIS_URL: redis://redis:6379
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis-app1
+    restart: unless-stopped
+    expose:
+      - "6379"
+    volumes:
+      - redis-data:/data
+
+volumes:
+  redis-data:
