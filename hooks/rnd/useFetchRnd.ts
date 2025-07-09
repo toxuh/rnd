@@ -62,6 +62,26 @@ export interface RandomPasswordRequest {
   length: number;
 }
 
+export interface ESP32RawStringRequest extends BaseRequest {
+  count?: number;
+  minLength?: number;
+  maxLength?: number;
+}
+
+export interface ESP32RawStringResponse {
+  rawString?: string;
+  rawStrings?: string[];
+  length?: number;
+  count?: number;
+  requestedCount?: number;
+  timestamp: string;
+  source: string;
+  filters?: {
+    minLength?: number;
+    maxLength?: number;
+  };
+}
+
 export type RndRequestType =
   | "number"
   | "boolean"
@@ -75,7 +95,8 @@ export type RndRequestType =
   | "weighted"
   | "hsl"
   | "gradient"
-  | "password";
+  | "password"
+  | "raw-string";
 
 export interface RndRequest<T = unknown> {
   type: RndRequestType;
@@ -383,6 +404,38 @@ export const useFetchRandomPassword = () => {
       }
 
       return response.data.result;
+    },
+  });
+};
+
+export const useFetchESP32RawString = () => {
+  return useMutation<ESP32RawStringResponse, Error, ESP32RawStringRequest>({
+    mutationFn: async (params) => {
+      const { apiKey, count, minLength, maxLength } = params;
+
+      if (!apiKey) {
+        throw new Error("API key is required for ESP32 raw string access");
+      }
+
+      // Use GET for single string, POST for multiple strings with filters
+      if (count && count > 1) {
+        const response = await apiClient.post<ESP32RawStringResponse>(
+          "/api/esp32/raw-string",
+          { count, minLength, maxLength },
+          {
+            headers: createHeaders(apiKey),
+          }
+        );
+        return response.data;
+      } else {
+        const response = await apiClient.get<ESP32RawStringResponse>(
+          "/api/esp32/raw-string",
+          {
+            headers: createHeaders(apiKey),
+          }
+        );
+        return response.data;
+      }
     },
   });
 };

@@ -22,7 +22,7 @@ import {
   SelectItem,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { useFetchRnd, type RndRequestType } from "@/hooks/rnd/useFetchRnd";
+import { useFetchRnd, useFetchESP32RawString, type RndRequestType } from "@/hooks/rnd/useFetchRnd";
 import { AuthButton } from "@/components/auth/auth-modal";
 
 const RND_TYPES = [
@@ -39,6 +39,7 @@ const RND_TYPES = [
   "hsl",
   "gradient",
   "password",
+  "raw-string",
 ] as const;
 
 type RndType = RndRequestType;
@@ -70,6 +71,13 @@ interface WeightedParams {
   items: [unknown, number][];
 }
 
+interface ESP32RawStringParams {
+  count?: number;
+  minLength?: number;
+  maxLength?: number;
+  apiKey?: string;
+}
+
 type RndParams =
   | NumberParams
   | FloatParams
@@ -77,6 +85,7 @@ type RndParams =
   | StringParams
   | DateParams
   | WeightedParams
+  | ESP32RawStringParams
   | Record<string, never>;
 
 const isValidRndType = (value: string): value is RndType => {
@@ -136,6 +145,18 @@ const formatResult = (result: unknown, type: RndType): ReactNode => {
         </div>
       );
 
+    case "raw-string":
+      return (
+        <div className="space-y-2">
+          <div className="text-xs text-muted-foreground mb-2">
+            Raw ESP32 Hardware String
+          </div>
+          <div className="font-mono text-sm break-all bg-muted p-2 rounded border max-h-32 overflow-y-auto">
+            {resultStr}
+          </div>
+        </div>
+      );
+
     default:
       return resultStr;
   }
@@ -152,14 +173,33 @@ const Page = () => {
   const [items, setItems] = useState("");
   const [copied, setCopied] = useState(false);
 
+  // ESP32 raw string parameters
+  const [rawStringCount, setRawStringCount] = useState(1);
+  const [rawStringMinLength, setRawStringMinLength] = useState<number | undefined>();
+  const [rawStringMaxLength, setRawStringMaxLength] = useState<number | undefined>();
+  const [apiKey, setApiKey] = useState("");
+
   const { mutate, data, isPending, error } = useFetchRnd();
+  const { mutate: mutateESP32, data: esp32Data, isPending: esp32Pending, error: esp32Error } = useFetchESP32RawString();
   const { theme, setTheme } = useTheme();
 
   const copyToClipboard = async () => {
-    if (!data?.result) return;
+    let textToCopy = "";
+
+    if (type === "raw-string" && esp32Data) {
+      if (esp32Data.rawString) {
+        textToCopy = esp32Data.rawString;
+      } else if (esp32Data.rawStrings) {
+        textToCopy = esp32Data.rawStrings.join("\n");
+      }
+    } else if (data?.result) {
+      textToCopy = String(data.result);
+    }
+
+    if (!textToCopy) return;
 
     try {
-      await navigator.clipboard.writeText(String(data.result));
+      await navigator.clipboard.writeText(textToCopy);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
@@ -203,6 +243,21 @@ const Page = () => {
           alert("Invalid JSON for items");
           return;
         }
+      } else if (type === "raw-string") {
+        if (!apiKey.trim()) {
+          alert("API key is required for ESP32 raw string access");
+          return;
+        }
+
+        const esp32Params: ESP32RawStringParams = {
+          apiKey: apiKey.trim(),
+          count: rawStringCount,
+          minLength: rawStringMinLength,
+          maxLength: rawStringMaxLength,
+        };
+
+        mutateESP32(esp32Params);
+        return;
       } else {
         params = {};
       }
@@ -383,8 +438,63 @@ const Page = () => {
                 </div>
               )}
 
-              <Button type="submit" className="w-full" disabled={isPending}>
-                {isPending ? "Generating..." : "Generate"}
+              {type === "raw-string" && (
+                <div className="space-y-4">
+                  <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <p className="text-sm text-yellow-800">
+                      <strong>Premium Feature:</strong> Requires API key with ESP32 raw access permission
+                    </p>
+                  </div>
+
+                  <div>
+                    <Label>API Key *</Label>
+                    <Input
+                      type="password"
+                      value={apiKey}
+                      onChange={(e) => setApiKey(e.target.value)}
+                      placeholder="Enter your API key"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <Label>Count (1-10)</Label>
+                    <Input
+                      type="number"
+                      min="1"
+                      max="10"
+                      value={rawStringCount}
+                      onChange={(e) => setRawStringCount(Number(e.target.value))}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label>Min Length (optional)</Label>
+                      <Input
+                        type="number"
+                        min="1"
+                        value={rawStringMinLength || ""}
+                        onChange={(e) => setRawStringMinLength(e.target.value ? Number(e.target.value) : undefined)}
+                        placeholder="No minimum"
+                      />
+                    </div>
+                    <div>
+                      <Label>Max Length (optional)</Label>
+                      <Input
+                        type="number"
+                        min="1"
+                        value={rawStringMaxLength || ""}
+                        onChange={(e) => setRawStringMaxLength(e.target.value ? Number(e.target.value) : undefined)}
+                        placeholder="No maximum"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <Button type="submit" className="w-full" disabled={isPending || esp32Pending}>
+                {(isPending || esp32Pending) ? "Generating..." : "Generate"}
               </Button>
             </form>
 
@@ -392,7 +502,7 @@ const Page = () => {
             <div className="space-y-2">
               <Label className="text-sm font-medium flex items-center gap-2">
                 Result
-                {data && (
+                {(data || esp32Data) && (
                   <Button
                     variant="outline"
                     size="sm"
@@ -411,20 +521,53 @@ const Page = () => {
                 )}
               </Label>
               <div className="p-4 bg-muted rounded-lg border min-h-[80px] flex items-center transition-all duration-200">
-                {isPending ? (
+                {(isPending || esp32Pending) ? (
                   <div className="flex items-center gap-3 text-muted-foreground w-full justify-center">
                     <div className="animate-spin h-5 w-5 border-2 border-current border-t-transparent rounded-full"></div>
                     <span className="font-medium">
-                      Generating true randomness...
+                      {type === "raw-string" ? "Fetching raw ESP32 data..." : "Generating true randomness..."}
                     </span>
                   </div>
-                ) : error ? (
+                ) : (error || esp32Error) ? (
                   <div className="text-red-600 w-full">
                     <div className="font-medium flex items-center gap-2">
                       Error:
                     </div>
                     <div className="text-sm mt-1 bg-red-50 p-2 rounded border border-red-200">
-                      {error.message}
+                      {error?.message || esp32Error?.message}
+                    </div>
+                  </div>
+                ) : esp32Data ? (
+                  <div className="w-full">
+                    <div className="space-y-3">
+                      {esp32Data.rawString && (
+                        <div>
+                          <div className="text-xs text-muted-foreground mb-2">
+                            Raw ESP32 Hardware String (Length: {esp32Data.length})
+                          </div>
+                          <div className="font-mono text-sm break-all bg-background p-3 rounded border max-h-32 overflow-y-auto">
+                            {esp32Data.rawString}
+                          </div>
+                        </div>
+                      )}
+                      {esp32Data.rawStrings && (
+                        <div>
+                          <div className="text-xs text-muted-foreground mb-2">
+                            Raw ESP32 Hardware Strings ({esp32Data.count} of {esp32Data.requestedCount} requested)
+                          </div>
+                          <div className="space-y-2 max-h-40 overflow-y-auto">
+                            {esp32Data.rawStrings.map((str, index) => (
+                              <div key={index} className="font-mono text-sm break-all bg-background p-2 rounded border">
+                                <div className="text-xs text-muted-foreground mb-1">String {index + 1} (Length: {str.length})</div>
+                                {str}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      <div className="text-xs text-muted-foreground">
+                        Source: {esp32Data.source} • Generated: {new Date(esp32Data.timestamp).toLocaleString()}
+                      </div>
                     </div>
                   </div>
                 ) : data ? (
