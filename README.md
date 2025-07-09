@@ -134,6 +134,32 @@ void handleRandomString() {
 }
 ```
 
+## 🔒 Security Features
+
+This application implements comprehensive security measures:
+
+- **API Key Authentication**: All requests require valid API keys
+- **Rate Limiting**: Prevents abuse with configurable limits
+- **Request Validation**: Input sanitization and size limits
+- **Security Monitoring**: Automatic threat detection and blocking
+- **Origin Validation**: CORS protection for production
+- **Request Signing**: Optional cryptographic verification
+
+See [Security Documentation](docs/SECURITY.md) for detailed information.
+
+### Quick Security Setup
+
+1. **Set API Keys** in your environment:
+```bash
+API_KEY_MAIN=rnd_your_secure_main_key
+API_KEY_ADMIN=rnd_your_secure_admin_key
+```
+
+2. **Include API Key** in requests:
+```bash
+curl -H "x-api-key: your_api_key" https://rnd.so/api/rnd/number
+```
+
 ## 📚 API Reference
 
 ### Generate Random Data
@@ -141,6 +167,7 @@ void handleRandomString() {
 ```http
 POST /api/rnd/{type}
 Content-Type: application/json
+x-api-key: your_api_key_here
 
 {
   "min": 1,

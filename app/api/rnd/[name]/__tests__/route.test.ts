@@ -21,11 +21,37 @@ jest.mock("@/services/rnd.service", () => ({
   randomPassword: jest.fn().mockResolvedValue("P@ssw0rd123"),
 }));
 
+// Mock security middleware
+jest.mock("@/lib/security-middleware", () => ({
+  securityMiddleware: {
+    validateRequest: jest.fn().mockResolvedValue({
+      success: true,
+      metadata: { rateLimitRemaining: 25, keyName: 'test-key' },
+    }),
+    createErrorResponse: jest.fn((error: string, status = 400) => ({
+      json: () => Promise.resolve({ error }),
+      status,
+    })),
+    createSuccessResponse: jest.fn((data: unknown) => ({
+      json: () => Promise.resolve(data),
+      status: 200,
+    })),
+    handleCORS: jest.fn(() => ({
+      status: 200,
+    })),
+  },
+}));
+
 // Helper function to create a mock NextRequest
 const createMockRequest = (pathname: string, body: Record<string, unknown>) => {
+  const bodyString = JSON.stringify(body);
   return {
     nextUrl: { pathname },
-    json: jest.fn().mockResolvedValue(body),
+    text: jest.fn().mockResolvedValue(bodyString),
+    headers: new Map([
+      ['x-api-key', 'test-key'],
+      ['content-type', 'application/json'],
+    ]),
   } as unknown as NextRequest;
 };
 

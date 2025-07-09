@@ -1,20 +1,52 @@
 "use server";
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 
+import { securityMiddleware } from "@/lib/security-middleware";
 import * as rnd from "@/services/rnd.service";
+
+export const OPTIONS = async () => {
+  return securityMiddleware.handleCORS();
+};
 
 export const POST = async (req: NextRequest) => {
   try {
-    const { min, max, choices, length, from, to, items } = await req.json();
+    const body = await req.text();
+    let parsedBody;
+
+    try {
+      parsedBody = JSON.parse(body);
+    } catch {
+      return securityMiddleware.createErrorResponse(
+        "Invalid JSON in request body",
+        400,
+      );
+    }
+
+    const securityResult = await securityMiddleware.validateRequest(
+      req,
+      {
+        requireAuth: true,
+        requiredPermission: "random:read",
+        rateLimitType: "random",
+        validateOrigin: process.env.NODE_ENV === "production",
+        maxBodySize: parseInt(process.env.MAX_REQUEST_SIZE || "10240"),
+      },
+      body,
+    );
+
+    if (!securityResult.success) {
+      return securityResult.response!;
+    }
+
+    const { min, max, choices, length, from, to, items } = parsedBody;
     const name = req.nextUrl.pathname.split("/").pop();
     let result: unknown;
 
     switch (name) {
       case "number":
         if (typeof min !== "number" || typeof max !== "number") {
-          return NextResponse.json(
-            { error: "min and max must be numbers for number generation" },
-            { status: 400 }
+          return securityMiddleware.createErrorResponse(
+            "min and max must be numbers for number generation",
           );
         }
         result = await rnd.randomNumber(min, max);
@@ -30,9 +62,8 @@ export const POST = async (req: NextRequest) => {
 
       case "choice":
         if (!Array.isArray(choices) || choices.length === 0) {
-          return NextResponse.json(
-            { error: "choices must be a non-empty array" },
-            { status: 400 }
+          return securityMiddleware.createErrorResponse(
+            "choices must be a non-empty array",
           );
         }
         result = await rnd.randomChoice(choices);
@@ -40,9 +71,13 @@ export const POST = async (req: NextRequest) => {
 
       case "string":
         if (typeof length !== "number" || length < 0) {
-          return NextResponse.json(
-            { error: "length must be a non-negative number" },
-            { status: 400 }
+          return securityMiddleware.createErrorResponse(
+            "length must be a non-negative number",
+          );
+        }
+        if (length > 1000) {
+          return securityMiddleware.createErrorResponse(
+            "string length cannot exceed 1000 characters",
           );
         }
         result = await rnd.randomString(length);
@@ -54,18 +89,14 @@ export const POST = async (req: NextRequest) => {
 
       case "date":
         if (!from || !to) {
-          return NextResponse.json(
-            { error: "from and to dates are required" },
-            { status: 400 }
+          return securityMiddleware.createErrorResponse(
+            "from and to dates are required",
           );
         }
         const fromDate = new Date(from);
         const toDate = new Date(to);
         if (isNaN(fromDate.getTime()) || isNaN(toDate.getTime())) {
-          return NextResponse.json(
-            { error: "Invalid date format" },
-            { status: 400 }
-          );
+          return securityMiddleware.createErrorResponse("Invalid date format");
         }
         const dateResult = await rnd.randomDate(fromDate, toDate);
         result = dateResult.toISOString();
@@ -77,9 +108,13 @@ export const POST = async (req: NextRequest) => {
 
       case "shuffle":
         if (!Array.isArray(choices) || choices.length === 0) {
-          return NextResponse.json(
-            { error: "choices must be a non-empty array for shuffle" },
-            { status: 400 }
+          return securityMiddleware.createErrorResponse(
+            "choices must be a non-empty array for shuffle",
+          );
+        }
+        if (choices.length > 1000) {
+          return securityMiddleware.createErrorResponse(
+            "array size cannot exceed 1000 items",
           );
         }
         result = await rnd.shuffle(choices);
@@ -87,19 +122,24 @@ export const POST = async (req: NextRequest) => {
 
       case "weighted":
         if (!Array.isArray(items) || items.length === 0) {
-          return NextResponse.json(
-            { error: "items must be a non-empty array of [value, weight] pairs" },
-            { status: 400 }
+          return securityMiddleware.createErrorResponse(
+            "items must be a non-empty array of [value, weight] pairs",
           );
         }
-        // Validate that items are in the correct format
+        if (items.length > 100) {
+          return securityMiddleware.createErrorResponse(
+            "weighted items array cannot exceed 100 items",
+          );
+        }
         const isValidWeightedItems = items.every(
-          (item) => Array.isArray(item) && item.length === 2 && typeof item[1] === "number"
+          (item) =>
+            Array.isArray(item) &&
+            item.length === 2 &&
+            typeof item[1] === "number",
         );
         if (!isValidWeightedItems) {
-          return NextResponse.json(
-            { error: "items must be an array of [value, weight] pairs where weight is a number" },
-            { status: 400 }
+          return securityMiddleware.createErrorResponse(
+            "items must be an array of [value, weight] pairs where weight is a number",
           );
         }
         result = await rnd.weightedChoice(items);
@@ -115,24 +155,41 @@ export const POST = async (req: NextRequest) => {
 
       case "password":
         if (typeof length !== "number" || length < 0) {
-          return NextResponse.json(
-            { error: "length must be a non-negative number for password generation" },
-            { status: 400 }
+          return securityMiddleware.createErrorResponse(
+            "length must be a non-negative number for password generation",
+          );
+        }
+        if (length > 128) {
+          return securityMiddleware.createErrorResponse(
+            "password length cannot exceed 128 characters",
           );
         }
         result = await rnd.randomPassword(length);
         break;
 
       default:
-        return NextResponse.json({ error: "Unknown rnd type" }, { status: 400 });
+        return securityMiddleware.createErrorResponse("Unknown rnd type");
     }
 
-    return NextResponse.json({ result });
+    if (process.env.ENABLE_REQUEST_LOGGING === "true") {
+      console.log(
+        `RND API: ${name} - Success - IP: ${req.headers.get("x-forwarded-for") || "unknown"}`,
+      );
+    }
+
+    return securityMiddleware.createSuccessResponse(
+      { result },
+      securityResult.metadata,
+    );
   } catch (error) {
     console.error("Error in RND API:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+
+    if (process.env.ENABLE_REQUEST_LOGGING === "true") {
+      console.log(
+        `RND API: Error - ${error} - IP: ${req.headers.get("x-forwarded-for") || "unknown"}`,
+      );
+    }
+
+    return securityMiddleware.createErrorResponse("Internal server error", 500);
   }
 };
