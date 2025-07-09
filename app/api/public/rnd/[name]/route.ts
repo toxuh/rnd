@@ -7,7 +7,7 @@ export const OPTIONS = async () => {
   return enhancedSecurityMiddleware.handleCORS();
 };
 
-export const POST = async (req: NextRequest, { params }: { params: { name: string } }) => {
+export const POST = async (req: NextRequest, { params }: { params: Promise<{ name: string }> }) => {
   try {
     const body = await req.text();
     let parsedBody;
@@ -39,7 +39,7 @@ export const POST = async (req: NextRequest, { params }: { params: { name: strin
     }
 
     const { min, max, choices, length, from, to, items } = parsedBody;
-    const { name } = params;
+    const { name } = await params;
     let result: unknown;
 
     switch (name) {
@@ -85,17 +85,68 @@ export const POST = async (req: NextRequest, { params }: { params: { name: strin
         break;
 
       case "shuffle":
+        if (!Array.isArray(choices) || choices.length === 0) {
+          return enhancedSecurityMiddleware.createErrorResponse(
+            "choices must be a non-empty array for shuffling",
+          );
+        }
+        if (choices.length > 1000) {
+          return enhancedSecurityMiddleware.createErrorResponse(
+            "choices array cannot exceed 1000 items for shuffling",
+          );
+        }
+        result = await rnd.shuffle(choices);
+        break;
+
+      case "float":
+        if (min !== undefined && typeof min !== "number") {
+          return enhancedSecurityMiddleware.createErrorResponse(
+            "min must be a number for float generation",
+          );
+        }
+        if (max !== undefined && typeof max !== "number") {
+          return enhancedSecurityMiddleware.createErrorResponse(
+            "max must be a number for float generation",
+          );
+        }
+        result = await rnd.randomFloat(min, max);
+        break;
+
+      case "color":
+        result = await rnd.randomHexColor();
+        break;
+
+      case "weighted":
         if (!Array.isArray(items) || items.length === 0) {
           return enhancedSecurityMiddleware.createErrorResponse(
-            "items must be a non-empty array for shuffling",
+            "items must be a non-empty array of [value, weight] pairs",
           );
         }
-        if (items.length > 1000) {
+        if (items.length > 100) {
           return enhancedSecurityMiddleware.createErrorResponse(
-            "items array cannot exceed 1000 items for shuffling",
+            "weighted items array cannot exceed 100 items",
           );
         }
-        result = await rnd.shuffle(items);
+        const isValidWeightedItems = items.every(
+          (item) =>
+            Array.isArray(item) &&
+            item.length === 2 &&
+            typeof item[1] === "number",
+        );
+        if (!isValidWeightedItems) {
+          return enhancedSecurityMiddleware.createErrorResponse(
+            "items must be an array of [value, weight] pairs where weight is a number",
+          );
+        }
+        result = await rnd.weightedChoice(items);
+        break;
+
+      case "hsl":
+        result = await rnd.randomHslColor();
+        break;
+
+      case "gradient":
+        result = await rnd.randomGradient();
         break;
 
       case "date":

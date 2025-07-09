@@ -93,7 +93,7 @@ export interface RndErrorResponse {
 export const useFetchRnd = <T = unknown>() => {
   return useMutation<RndResponse<T>, Error, RndRequest>({
     mutationFn: async ({ type, params = {} }) => {
-      const { apiKey, ...requestParams } = params;
+      const { apiKey, ...requestParams } = params as BaseRequest & Record<string, unknown>;
 
       // Choose endpoint based on whether API key is provided
       const endpoint = apiKey ? `/api/rnd/${type}` : `/api/public/rnd/${type}`;
@@ -160,9 +160,14 @@ export const useFetchRandomBoolean = () => {
 export const useFetchRandomFloat = () => {
   return useMutation<number, Error, RandomFloatRequest>({
     mutationFn: async (params = {}) => {
+      const { apiKey, ...requestParams } = params;
+      const endpoint = apiKey ? "/api/rnd/float" : "/api/public/rnd/float";
+
       const response = await apiClient.post<
         RndResponse<number> | RndErrorResponse
-      >("/api/rnd/float", params);
+      >(endpoint, requestParams, {
+        headers: createHeaders(apiKey),
+      });
 
       if ("error" in response.data) {
         throw new Error(response.data.error);
@@ -176,9 +181,15 @@ export const useFetchRandomFloat = () => {
 export const useFetchRandomChoice = <T = unknown>() => {
   return useMutation<T, Error, RandomChoiceRequest<T>>({
     mutationFn: async (params) => {
+      const { apiKey, ...requestParams } = params;
+      const endpoint = apiKey ? "/api/rnd/choice" : "/api/public/rnd/choice";
+
       const response = await apiClient.post<RndResponse<T> | RndErrorResponse>(
-        "/api/rnd/choice",
-        params,
+        endpoint,
+        requestParams,
+        {
+          headers: createHeaders(apiKey),
+        }
       );
 
       if ("error" in response.data) {
@@ -193,9 +204,14 @@ export const useFetchRandomChoice = <T = unknown>() => {
 export const useFetchRandomString = () => {
   return useMutation<string, Error, RandomStringRequest>({
     mutationFn: async (params) => {
+      const { apiKey, ...requestParams } = params;
+      const endpoint = apiKey ? "/api/rnd/string" : "/api/public/rnd/string";
+
       const response = await apiClient.post<
         RndResponse<string> | RndErrorResponse
-      >("/api/rnd/string", params);
+      >(endpoint, requestParams, {
+        headers: createHeaders(apiKey),
+      });
 
       if ("error" in response.data) {
         throw new Error(response.data.error);
@@ -207,11 +223,16 @@ export const useFetchRandomString = () => {
 };
 
 export const useFetchRandomColor = () => {
-  return useMutation<string, Error, void>({
-    mutationFn: async () => {
+  return useMutation<string, Error, BaseRequest>({
+    mutationFn: async (params = {}) => {
+      const { apiKey } = params;
+      const endpoint = apiKey ? "/api/rnd/color" : "/api/public/rnd/color";
+
       const response = await apiClient.post<
         RndResponse<string> | RndErrorResponse
-      >("/api/rnd/color", {});
+      >(endpoint, {}, {
+        headers: createHeaders(apiKey),
+      });
 
       if ("error" in response.data) {
         throw new Error(response.data.error);
@@ -225,9 +246,14 @@ export const useFetchRandomColor = () => {
 export const useFetchRandomDate = () => {
   return useMutation<string, Error, RandomDateRequest>({
     mutationFn: async (params) => {
+      const { apiKey, ...requestParams } = params;
+      const endpoint = apiKey ? "/api/rnd/date" : "/api/public/rnd/date";
+
       const response = await apiClient.post<
         RndResponse<string> | RndErrorResponse
-      >("/api/rnd/date", params);
+      >(endpoint, requestParams, {
+        headers: createHeaders(apiKey),
+      });
 
       if ("error" in response.data) {
         throw new Error(response.data.error);
@@ -239,11 +265,16 @@ export const useFetchRandomDate = () => {
 };
 
 export const useFetchRandomUUID = () => {
-  return useMutation<string, Error, void>({
-    mutationFn: async () => {
+  return useMutation<string, Error, BaseRequest>({
+    mutationFn: async (params = {}) => {
+      const { apiKey } = params;
+      const endpoint = apiKey ? "/api/rnd/uuid" : "/api/public/rnd/uuid";
+
       const response = await apiClient.post<
         RndResponse<string> | RndErrorResponse
-      >("/api/rnd/uuid", {});
+      >(endpoint, {}, {
+        headers: createHeaders(apiKey),
+      });
 
       if ("error" in response.data) {
         throw new Error(response.data.error);
@@ -257,9 +288,14 @@ export const useFetchRandomUUID = () => {
 export const useFetchRandomShuffle = <T = unknown>() => {
   return useMutation<T[], Error, RandomShuffleRequest<T>>({
     mutationFn: async (params) => {
+      const { apiKey, ...requestParams } = params;
+      const endpoint = apiKey ? "/api/rnd/shuffle" : "/api/public/rnd/shuffle";
+
       const response = await apiClient.post<
         RndResponse<T[]> | RndErrorResponse
-      >("/api/rnd/shuffle", params);
+      >(endpoint, requestParams, {
+        headers: createHeaders(apiKey),
+      });
 
       if ("error" in response.data) {
         throw new Error(response.data.error);
@@ -273,9 +309,15 @@ export const useFetchRandomShuffle = <T = unknown>() => {
 export const useFetchRandomWeighted = <T = unknown>() => {
   return useMutation<T, Error, RandomWeightedRequest<T>>({
     mutationFn: async (params) => {
+      const { apiKey, ...requestParams } = params;
+      const endpoint = apiKey ? "/api/rnd/weighted" : "/api/public/rnd/weighted";
+
       const response = await apiClient.post<RndResponse<T> | RndErrorResponse>(
-        "/api/rnd/weighted",
-        params,
+        endpoint,
+        requestParams,
+        {
+          headers: createHeaders(apiKey),
+        }
       );
 
       if ("error" in response.data) {
@@ -288,11 +330,16 @@ export const useFetchRandomWeighted = <T = unknown>() => {
 };
 
 export const useFetchRandomHslColor = () => {
-  return useMutation<string, Error, void>({
-    mutationFn: async () => {
+  return useMutation<string, Error, BaseRequest>({
+    mutationFn: async (params = {}) => {
+      const { apiKey } = params;
+      const endpoint = apiKey ? "/api/rnd/hsl" : "/api/public/rnd/hsl";
+
       const response = await apiClient.post<
         RndResponse<string> | RndErrorResponse
-      >("/api/rnd/hsl", {});
+      >(endpoint, {}, {
+        headers: createHeaders(apiKey),
+      });
 
       if ("error" in response.data) {
         throw new Error(response.data.error);
@@ -304,11 +351,16 @@ export const useFetchRandomHslColor = () => {
 };
 
 export const useFetchRandomGradient = () => {
-  return useMutation<string, Error, void>({
-    mutationFn: async () => {
+  return useMutation<string, Error, BaseRequest>({
+    mutationFn: async (params = {}) => {
+      const { apiKey } = params;
+      const endpoint = apiKey ? "/api/rnd/gradient" : "/api/public/rnd/gradient";
+
       const response = await apiClient.post<
         RndResponse<string> | RndErrorResponse
-      >("/api/rnd/gradient", {});
+      >(endpoint, {}, {
+        headers: createHeaders(apiKey),
+      });
 
       if ("error" in response.data) {
         throw new Error(response.data.error);

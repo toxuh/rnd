@@ -37,8 +37,9 @@ const checkESP32Health = async (): Promise<boolean> => {
   }
 
   try {
-    const response = await axios.get(`${RND_SERVER_URL}/health`, { timeout: 5000 });
-    esp32HealthStatus = { isHealthy: response.status === 200, lastCheck: now };
+    // Use the actual endpoint that exists on ESP32 for health check
+    const response = await axios.get(`${RND_SERVER_URL}/get-random-string`, { timeout: 5000 });
+    esp32HealthStatus = { isHealthy: response.status === 200 && response.data, lastCheck: now };
     return esp32HealthStatus.isHealthy;
   } catch (error) {
     console.warn("ESP32 health check failed:", error);

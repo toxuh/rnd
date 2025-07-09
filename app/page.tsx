@@ -300,6 +300,31 @@ const Page = () => {
                 </div>
               )}
 
+              {type === "float" && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Min (optional)</Label>
+                    <Input
+                      type="number"
+                      step="any"
+                      value={min}
+                      onChange={(e) => setMin(Number(e.target.value))}
+                      placeholder="0"
+                    />
+                  </div>
+                  <div>
+                    <Label>Max (optional)</Label>
+                    <Input
+                      type="number"
+                      step="any"
+                      value={max}
+                      onChange={(e) => setMax(Number(e.target.value))}
+                      placeholder="1"
+                    />
+                  </div>
+                </div>
+              )}
+
               {["choice", "shuffle"].includes(type) && (
                 <div>
                   <Label>Choices (comma separated)</Label>

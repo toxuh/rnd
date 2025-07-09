@@ -78,14 +78,24 @@ async function checkESP32Health(): Promise<{
 
   try {
     const start = Date.now();
-    const response = await fetch(`${env.RND_SERVER_URL}/health`, {
+    // Use the actual endpoint that exists on ESP32 for health check
+    const response = await fetch(`${env.RND_SERVER_URL}/get-random-string`, {
       method: 'GET',
-      timeout: 5000, // 5 second timeout
+      signal: AbortSignal.timeout(5000), // 5 second timeout
     });
     const latency = Date.now() - start;
 
     if (response.ok) {
-      return { status: 'up', latency };
+      const data = await response.text();
+      // Verify we got actual random data
+      if (data && data.length > 0) {
+        return { status: 'up', latency };
+      } else {
+        return {
+          status: 'down',
+          error: 'ESP32 returned empty response',
+        };
+      }
     } else {
       return {
         status: 'down',
