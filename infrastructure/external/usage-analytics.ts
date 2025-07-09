@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from './prisma';
+import { prisma } from '../../data/prisma/prisma';
 
 export interface UsageMetrics {
   totalRequests: number;
@@ -187,19 +187,19 @@ export class UsageAnalytics {
       records.forEach(record => {
         // Endpoint stats
         requestsByEndpoint[record.endpoint] = (requestsByEndpoint[record.endpoint] || 0) + 1;
-        
+
         // Status code stats
         const statusGroup = `${Math.floor(record.statusCode / 100)}xx`;
         requestsByStatus[statusGroup] = (requestsByStatus[statusGroup] || 0) + 1;
-        
+
         // API key stats
         if (record.apiKey?.name) {
           apiKeyRequests[record.apiKey.name] = (apiKeyRequests[record.apiKey.name] || 0) + 1;
         }
-        
+
         // Response time
         totalResponseTime += record.responseTime;
-        
+
         // Error count
         if (record.statusCode >= 400) {
           errorCount++;
@@ -297,7 +297,7 @@ export class UsageAnalytics {
       const totalRequests = records.length;
       const successCount = records.filter(r => r.statusCode < 400).length;
       const totalResponseTime = records.reduce((sum, r) => sum + r.responseTime, 0);
-      
+
       const requestsByEndpoint: Record<string, number> = {};
       records.forEach(record => {
         requestsByEndpoint[record.endpoint] = (requestsByEndpoint[record.endpoint] || 0) + 1;

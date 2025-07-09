@@ -1,7 +1,7 @@
 import { createHash } from 'crypto';
 import { NextRequest } from 'next/server';
-import { prisma } from './prisma';
-import { getRedisClient } from './redis';
+import { prisma } from '../../data/prisma/prisma';
+import { getRedisClient } from '../../data/redis/redis';
 import { ApiKey, User } from '@prisma/client';
 
 export interface AuthResult {
@@ -103,7 +103,7 @@ export class EnhancedApiKeyAuth {
       // Try Redis cache first
       const cacheKey = `api_key:${keyHash}`;
       const cached = await this.redis.get(cacheKey);
-      
+
       if (cached) {
         return JSON.parse(cached);
       }
@@ -232,7 +232,7 @@ export class EnhancedApiKeyAuth {
     // Check for wildcard patterns (e.g., "random:*" matches "random:read")
     const [requiredNamespace, requiredAction] = required.split(':');
     const wildcardPermission = `${requiredNamespace}:*`;
-    
+
     return permissions.includes(wildcardPermission);
   }
 

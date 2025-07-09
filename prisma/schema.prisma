@@ -48,6 +48,7 @@ model ApiKey {
   keyPreview  String     // First 8 chars for display (e.g., "rnd_1234...")
   permissions String[]   // Array of permissions like ["random:*", "admin:read"]
   rateLimit   Int        @default(100) // Requests per minute (user default: 100)
+  maxRequests Int        @default(10000) // Maximum total requests allowed
   isActive    Boolean    @default(true)
   expiresAt   DateTime?  // Optional expiration
   createdAt   DateTime   @default(now())
@@ -72,9 +73,10 @@ model ApiKeyPolicy {
   id                String   @id @default(cuid())
   name              String   @unique
   description       String?
-  maxKeysPerUser    Int      @default(5) // Max API keys per user
+  maxKeysPerUser    Int      @default(10) // Max API keys per user (updated to 10)
   defaultRateLimit  Int      @default(100) // Default requests per minute
   maxRateLimit      Int      @default(1000) // Maximum allowed rate limit
+  defaultMaxRequests Int     @default(10000) // Default max total requests per key
   allowedEndpoints  String[] // Allowed endpoint patterns
   isActive          Boolean  @default(true)
   createdAt         DateTime @default(now())

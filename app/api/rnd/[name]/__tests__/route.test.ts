@@ -5,7 +5,7 @@ import { NextRequest } from "next/server";
 import { POST } from "../route";
 
 // Mock the rnd service
-jest.mock("@/services/rnd.service", () => ({
+jest.mock("@/core/services/rnd.service", () => ({
   randomNumber: jest.fn().mockResolvedValue(42),
   randomBoolean: jest.fn().mockResolvedValue(true),
   randomFloat: jest.fn().mockResolvedValue(0.5),
@@ -22,8 +22,8 @@ jest.mock("@/services/rnd.service", () => ({
 }));
 
 // Mock security middleware
-jest.mock("@/lib/security-middleware", () => ({
-  securityMiddleware: {
+jest.mock("@/infrastructure/middleware/enhanced-security-middleware", () => ({
+  enhancedSecurityMiddleware: {
     validateRequest: jest.fn().mockResolvedValue({
       success: true,
       metadata: { rateLimitRemaining: 25, keyName: 'test-key' },

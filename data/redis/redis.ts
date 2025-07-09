@@ -1,5 +1,5 @@
 import Redis from 'ioredis';
-import { env, getRedisInfo } from './env-validation';
+import { env, getRedisInfo } from '../../lib/env-validation';
 
 let redis: Redis | null = null;
 

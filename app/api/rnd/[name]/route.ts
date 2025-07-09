@@ -1,11 +1,11 @@
 "use server";
 import { NextRequest } from "next/server";
 
-import { securityMiddleware } from "@/lib/security-middleware";
-import * as rnd from "@/services/rnd.service";
+import { enhancedSecurityMiddleware } from "@/infrastructure/middleware/enhanced-security-middleware";
+import * as rnd from "@/core/services/rnd.service";
 
 export const OPTIONS = async () => {
-  return securityMiddleware.handleCORS();
+  return enhancedSecurityMiddleware.handleCORS();
 };
 
 export const POST = async (req: NextRequest) => {
@@ -16,13 +16,13 @@ export const POST = async (req: NextRequest) => {
     try {
       parsedBody = JSON.parse(body);
     } catch {
-      return securityMiddleware.createErrorResponse(
+      return enhancedSecurityMiddleware.createErrorResponse(
         "Invalid JSON in request body",
         400,
       );
     }
 
-    const securityResult = await securityMiddleware.validateRequest(
+    const securityResult = await enhancedSecurityMiddleware.validateRequest(
       req,
       {
         requireAuth: true,
@@ -45,7 +45,7 @@ export const POST = async (req: NextRequest) => {
     switch (name) {
       case "number":
         if (typeof min !== "number" || typeof max !== "number") {
-          return securityMiddleware.createErrorResponse(
+          return enhancedSecurityMiddleware.createErrorResponse(
             "min and max must be numbers for number generation",
           );
         }
@@ -62,7 +62,7 @@ export const POST = async (req: NextRequest) => {
 
       case "choice":
         if (!Array.isArray(choices) || choices.length === 0) {
-          return securityMiddleware.createErrorResponse(
+          return enhancedSecurityMiddleware.createErrorResponse(
             "choices must be a non-empty array",
           );
         }
@@ -71,12 +71,12 @@ export const POST = async (req: NextRequest) => {
 
       case "string":
         if (typeof length !== "number" || length < 0) {
-          return securityMiddleware.createErrorResponse(
+          return enhancedSecurityMiddleware.createErrorResponse(
             "length must be a non-negative number",
           );
         }
         if (length > 1000) {
-          return securityMiddleware.createErrorResponse(
+          return enhancedSecurityMiddleware.createErrorResponse(
             "string length cannot exceed 1000 characters",
           );
         }
@@ -89,14 +89,14 @@ export const POST = async (req: NextRequest) => {
 
       case "date":
         if (!from || !to) {
-          return securityMiddleware.createErrorResponse(
+          return enhancedSecurityMiddleware.createErrorResponse(
             "from and to dates are required",
           );
         }
         const fromDate = new Date(from);
         const toDate = new Date(to);
         if (isNaN(fromDate.getTime()) || isNaN(toDate.getTime())) {
-          return securityMiddleware.createErrorResponse("Invalid date format");
+          return enhancedSecurityMiddleware.createErrorResponse("Invalid date format");
         }
         const dateResult = await rnd.randomDate(fromDate, toDate);
         result = dateResult.toISOString();
@@ -108,12 +108,12 @@ export const POST = async (req: NextRequest) => {
 
       case "shuffle":
         if (!Array.isArray(choices) || choices.length === 0) {
-          return securityMiddleware.createErrorResponse(
+          return enhancedSecurityMiddleware.createErrorResponse(
             "choices must be a non-empty array for shuffle",
           );
         }
         if (choices.length > 1000) {
-          return securityMiddleware.createErrorResponse(
+          return enhancedSecurityMiddleware.createErrorResponse(
             "array size cannot exceed 1000 items",
           );
         }
@@ -122,12 +122,12 @@ export const POST = async (req: NextRequest) => {
 
       case "weighted":
         if (!Array.isArray(items) || items.length === 0) {
-          return securityMiddleware.createErrorResponse(
+          return enhancedSecurityMiddleware.createErrorResponse(
             "items must be a non-empty array of [value, weight] pairs",
           );
         }
         if (items.length > 100) {
-          return securityMiddleware.createErrorResponse(
+          return enhancedSecurityMiddleware.createErrorResponse(
             "weighted items array cannot exceed 100 items",
           );
         }
@@ -138,7 +138,7 @@ export const POST = async (req: NextRequest) => {
             typeof item[1] === "number",
         );
         if (!isValidWeightedItems) {
-          return securityMiddleware.createErrorResponse(
+          return enhancedSecurityMiddleware.createErrorResponse(
             "items must be an array of [value, weight] pairs where weight is a number",
           );
         }
@@ -155,12 +155,12 @@ export const POST = async (req: NextRequest) => {
 
       case "password":
         if (typeof length !== "number" || length < 0) {
-          return securityMiddleware.createErrorResponse(
+          return enhancedSecurityMiddleware.createErrorResponse(
             "length must be a non-negative number for password generation",
           );
         }
         if (length > 128) {
-          return securityMiddleware.createErrorResponse(
+          return enhancedSecurityMiddleware.createErrorResponse(
             "password length cannot exceed 128 characters",
           );
         }
@@ -168,7 +168,7 @@ export const POST = async (req: NextRequest) => {
         break;
 
       default:
-        return securityMiddleware.createErrorResponse("Unknown rnd type");
+        return enhancedSecurityMiddleware.createErrorResponse("Unknown rnd type");
     }
 
     if (process.env.ENABLE_REQUEST_LOGGING === "true") {
@@ -177,7 +177,7 @@ export const POST = async (req: NextRequest) => {
       );
     }
 
-    return securityMiddleware.createSuccessResponse(
+    return enhancedSecurityMiddleware.createSuccessResponse(
       { result },
       securityResult.metadata,
     );
@@ -190,6 +190,6 @@ export const POST = async (req: NextRequest) => {
       );
     }
 
-    return securityMiddleware.createErrorResponse("Internal server error", 500);
+    return enhancedSecurityMiddleware.createErrorResponse("Internal server error", 500);
   }
 };

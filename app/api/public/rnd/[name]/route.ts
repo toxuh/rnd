@@ -1,7 +1,7 @@
 "use server";
 import { NextRequest } from "next/server";
-import { enhancedSecurityMiddleware } from "@/lib/enhanced-security-middleware";
-import * as rnd from "@/services/rnd.service";
+import { enhancedSecurityMiddleware } from "@/infrastructure/middleware/enhanced-security-middleware";
+import * as rnd from "@/core/services/rnd.service";
 
 export const OPTIONS = async () => {
   return enhancedSecurityMiddleware.handleCORS();

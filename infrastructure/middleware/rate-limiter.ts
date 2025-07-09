@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 
-import { getRedisClient } from "./redis";
+import { getRedisClient } from "../../data/redis/redis";
 
 export interface RateLimitConfig {
   windowMs: number;

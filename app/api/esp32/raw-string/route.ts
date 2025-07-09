@@ -1,6 +1,6 @@
 "use server";
 import { NextRequest } from "next/server";
-import { enhancedSecurityMiddleware } from "@/lib/enhanced-security-middleware";
+import { enhancedSecurityMiddleware } from "@/infrastructure/middleware/enhanced-security-middleware";
 import axios from "axios";
 
 export const OPTIONS = async () => {

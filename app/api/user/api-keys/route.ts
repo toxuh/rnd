@@ -1,8 +1,8 @@
 "use server";
 import { NextRequest } from "next/server";
-import { authService } from "@/lib/auth-service";
-import { userApiKeyService } from "@/lib/user-api-key-service";
-import { enhancedSecurityMiddleware } from "@/lib/enhanced-security-middleware";
+import { authService } from "@/core/services/auth-service";
+import { userApiKeyService } from "@/core/services/user-api-key-service";
+import { enhancedSecurityMiddleware } from "@/infrastructure/middleware/enhanced-security-middleware";
 
 export const OPTIONS = async () => {
   return enhancedSecurityMiddleware.handleCORS();
@@ -82,7 +82,7 @@ export const POST = async (req: NextRequest) => {
       );
     }
 
-    const { name, rateLimit, expiresAt } = parsedBody;
+    const { name, rateLimit, maxRequests, expiresAt } = parsedBody;
 
     if (!name || typeof name !== 'string' || name.trim().length === 0) {
       return enhancedSecurityMiddleware.createErrorResponse(
@@ -106,6 +106,14 @@ export const POST = async (req: NextRequest) => {
       );
     }
 
+    // Validate max requests if provided
+    if (maxRequests !== undefined && (typeof maxRequests !== 'number' || maxRequests < 1 || maxRequests > 10000)) {
+      return enhancedSecurityMiddleware.createErrorResponse(
+        "Max requests must be between 1 and 10000",
+        400
+      );
+    }
+
     // Validate expiration date if provided
     let expirationDate: Date | undefined;
     if (expiresAt) {
@@ -122,6 +130,7 @@ export const POST = async (req: NextRequest) => {
     const result = await userApiKeyService.createApiKey(user.id, {
       name: name.trim(),
       rateLimit,
+      maxRequests,
       expiresAt: expirationDate,
     });
 

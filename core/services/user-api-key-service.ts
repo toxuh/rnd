@@ -1,11 +1,12 @@
 import { createHash } from 'crypto';
-import { prisma } from './prisma';
-import { getRedisClient } from './redis';
+import { prisma } from '../../data/prisma/prisma';
+import { getRedisClient } from '../../data/redis/redis';
 import { ApiKey } from '@prisma/client';
 
 export interface CreateApiKeyData {
   name: string;
   rateLimit?: number;
+  maxRequests?: number;
   expiresAt?: Date;
 }
 
@@ -19,9 +20,10 @@ export interface ApiKeyWithStats extends ApiKey {
 
 export class UserApiKeyService {
   private redis = getRedisClient();
-  private readonly MAX_KEYS_PER_USER = 5; // Default limit
+  private readonly MAX_KEYS_PER_USER = 10; // Updated to match requirements
   private readonly DEFAULT_RATE_LIMIT = 100; // requests per minute
   private readonly MAX_RATE_LIMIT = 1000; // maximum allowed rate limit
+  private readonly DEFAULT_MAX_REQUESTS = 10000; // total requests per key
 
   /**
    * Hash an API key using SHA-256
@@ -54,6 +56,7 @@ export class UserApiKeyService {
     maxKeys: number;
     defaultRateLimit: number;
     maxRateLimit: number;
+    defaultMaxRequests: number;
   }> {
     try {
       // For now, use default limits. Later can be customized per user/plan
@@ -66,6 +69,7 @@ export class UserApiKeyService {
         maxKeys: policy?.maxKeysPerUser || this.MAX_KEYS_PER_USER,
         defaultRateLimit: policy?.defaultRateLimit || this.DEFAULT_RATE_LIMIT,
         maxRateLimit: policy?.maxRateLimit || this.MAX_RATE_LIMIT,
+        defaultMaxRequests: this.DEFAULT_MAX_REQUESTS,
       };
     } catch (error) {
       console.error('Failed to get user limits:', error);
@@ -73,6 +77,7 @@ export class UserApiKeyService {
         maxKeys: this.MAX_KEYS_PER_USER,
         defaultRateLimit: this.DEFAULT_RATE_LIMIT,
         maxRateLimit: this.MAX_RATE_LIMIT,
+        defaultMaxRequests: this.DEFAULT_MAX_REQUESTS,
       };
     }
   }
@@ -110,6 +115,15 @@ export class UserApiKeyService {
         };
       }
 
+      // Validate max requests
+      const maxRequests = data.maxRequests || limits.defaultMaxRequests;
+      if (maxRequests > limits.defaultMaxRequests) {
+        return {
+          success: false,
+          error: `Maximum requests cannot exceed ${limits.defaultMaxRequests}`,
+        };
+      }
+
       // Check for duplicate names
       const existingKey = await prisma.apiKey.findFirst({
         where: {
@@ -139,6 +153,7 @@ export class UserApiKeyService {
           keyPreview,
           permissions: ['random:*'], // Default permissions for user-generated keys
           rateLimit,
+          maxRequests,
           userId,
           expiresAt: data.expiresAt,
         },
@@ -441,6 +456,70 @@ export class UserApiKeyService {
     } catch (error) {
       console.error('Failed to get requests over time:', error);
       return [];
+    }
+  }
+
+  /**
+   * Check if API key has exceeded its request limit
+   */
+  async checkRequestLimit(keyHash: string): Promise<{
+    allowed: boolean;
+    remaining: number;
+    total: number;
+    maxRequests: number;
+  }> {
+    try {
+      const apiKey = await prisma.apiKey.findUnique({
+        where: { keyHash },
+        select: { totalRequests: true, maxRequests: true, isActive: true },
+      });
+
+      if (!apiKey || !apiKey.isActive) {
+        return {
+          allowed: false,
+          remaining: 0,
+          total: 0,
+          maxRequests: 0,
+        };
+      }
+
+      const remaining = Math.max(0, apiKey.maxRequests - apiKey.totalRequests);
+      const allowed = apiKey.totalRequests < apiKey.maxRequests;
+
+      return {
+        allowed,
+        remaining,
+        total: apiKey.totalRequests,
+        maxRequests: apiKey.maxRequests,
+      };
+    } catch (error) {
+      console.error('Failed to check request limit:', error);
+      return {
+        allowed: false,
+        remaining: 0,
+        total: 0,
+        maxRequests: 0,
+      };
+    }
+  }
+
+  /**
+   * Increment request count for an API key
+   */
+  async incrementRequestCount(keyHash: string): Promise<boolean> {
+    try {
+      await prisma.apiKey.update({
+        where: { keyHash },
+        data: {
+          totalRequests: { increment: 1 },
+          lastUsedAt: new Date(),
+          lastRequestAt: new Date(),
+        },
+      });
+      return true;
+    } catch (error) {
+      console.error('Failed to increment request count:', error);
+      return false;
     }
   }
 }

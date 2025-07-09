@@ -3,10 +3,32 @@
 // Mock Next.js environment
 global.Request = global.Request || class Request {
   constructor(url, options = {}) {
-    this.url = url;
+    this._url = url;
     this.method = options.method || 'GET';
     this.headers = new Headers(options.headers);
     this.body = options.body;
+
+    // Store URL object for nextUrl getter
+    this._urlObj = new URL(url);
+  }
+
+  get url() {
+    return this._url;
+  }
+
+  get nextUrl() {
+    return {
+      pathname: this._urlObj.pathname,
+      searchParams: this._urlObj.searchParams,
+    };
+  }
+
+  async text() {
+    return this.body || '';
+  }
+
+  async json() {
+    return JSON.parse(this.body || '{}');
   }
 };
 
@@ -83,7 +105,7 @@ jest.mock('ioredis', () => {
 });
 
 // Mock Prisma
-jest.mock('@/lib/prisma', () => ({
+jest.mock('@/data/prisma/prisma', () => ({
   prisma: {
     user: {
       findUnique: jest.fn(),

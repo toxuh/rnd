@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { prisma } from './prisma';
+import { prisma } from '../../data/prisma/prisma';
 import { User, UserRole } from '@prisma/client';
 import { NextRequest } from 'next/server';
 

@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createRateLimiters } from './rate-limiter';
 import { enhancedApiKeyAuth } from './enhanced-auth';
-import { enhancedSecurityMonitor } from './enhanced-security-monitor';
-import { usageAnalytics } from './usage-analytics';
+import { enhancedSecurityMonitor } from '../external/enhanced-security-monitor';
+import { usageAnalytics } from '../external/usage-analytics';
+import { userApiKeyService } from '../../core/services/user-api-key-service';
 import { SecurityEventType, EventSeverity } from '@prisma/client';
 
 export interface EnhancedSecurityConfig {
@@ -152,6 +153,41 @@ export class EnhancedSecurityMiddleware {
             ),
           };
         }
+
+        // 4.1. Check API key request limit
+        if (authResult.keyHash) {
+          const requestLimitResult = await userApiKeyService.checkRequestLimit(authResult.keyHash);
+
+          if (!requestLimitResult.allowed) {
+            await enhancedSecurityMonitor.logSecurityEvent({
+              type: SecurityEventType.RATE_LIMIT_EXCEEDED,
+              ip,
+              userAgent,
+              endpoint: req.nextUrl.pathname,
+              details: {
+                reason: 'API key request limit exceeded',
+                totalRequests: requestLimitResult.total,
+                maxRequests: requestLimitResult.maxRequests,
+              },
+              severity: EventSeverity.MEDIUM,
+            });
+
+            return {
+              success: false,
+              response: NextResponse.json(
+                {
+                  error: 'API key request limit exceeded',
+                  details: {
+                    totalRequests: requestLimitResult.total,
+                    maxRequests: requestLimitResult.maxRequests,
+                    remaining: requestLimitResult.remaining,
+                  }
+                },
+                { status: 429 }
+              ),
+            };
+          }
+        }
       }
 
       // 5. Apply rate limiting
@@ -213,6 +249,7 @@ export class EnhancedSecurityMiddleware {
           rateLimitRemaining: rateLimitResult.remaining,
           rateLimitReset: rateLimitResult.resetTime,
           keyName: authResult?.keyInfo?.name,
+          keyHash: authResult?.keyHash,
           userId: authResult?.user?.id,
         },
       };
@@ -236,7 +273,7 @@ export class EnhancedSecurityMiddleware {
     if (!origin) return true; // Allow requests without origin (e.g., server-to-server)
 
     const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [];
-    return allowedOrigins.some(allowed => 
+    return allowedOrigins.some(allowed =>
       allowed.trim() === origin || allowed.trim() === '*'
     );
   }
@@ -284,6 +321,14 @@ export class EnhancedSecurityMiddleware {
       response.headers.set('X-RateLimit-Reset', metadata.rateLimitReset.toString());
     }
 
+    // Increment API key request count if keyHash is available
+    if (metadata?.keyHash) {
+      // Fire and forget - don't wait for this to complete
+      userApiKeyService.incrementRequestCount(metadata.keyHash).catch(error => {
+        console.error('Failed to increment request count:', error);
+      });
+    }
+
     return response;
   }
 
@@ -312,12 +357,12 @@ export class EnhancedSecurityMiddleware {
    */
   handleCORS(): NextResponse {
     const response = new NextResponse(null, { status: 200 });
-    
+
     response.headers.set('Access-Control-Allow-Origin', '*');
     response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
     response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-api-key, x-signature, x-timestamp');
     response.headers.set('Access-Control-Max-Age', '86400');
-    
+
     this.addSecurityHeaders(response);
     return response;
   }

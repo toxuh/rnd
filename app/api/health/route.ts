@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { ErrorHandler, withErrorHandler } from '@/lib/error-handler';
-import { checkRedisHealth } from '@/lib/redis';
-import { prisma } from '@/lib/prisma';
+import { checkRedisHealth } from '@/data/redis/redis';
+import { prisma } from '@/data/prisma/prisma';
 import { env, getDatabaseInfo, getRedisInfo, isESP32Available } from '@/lib/env-validation';
 
 interface HealthStatus {
@@ -54,7 +54,7 @@ async function checkDatabaseHealth(): Promise<{
     const start = Date.now();
     await prisma.$queryRaw`SELECT 1`;
     const latency = Date.now() - start;
-    
+
     return { status: 'up', latency };
   } catch (error) {
     return {
@@ -169,7 +169,7 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
   }
 
   // Return appropriate HTTP status code
-  const httpStatus = overallStatus === 'healthy' ? 200 : 
+  const httpStatus = overallStatus === 'healthy' ? 200 :
                     overallStatus === 'degraded' ? 200 : 503;
 
   return ErrorHandler.createSuccessResponse(healthStatus, undefined, httpStatus);

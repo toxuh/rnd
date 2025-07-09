@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
-import { prisma } from './prisma';
-import { getRedisClient } from './redis';
+import { prisma } from '../../data/prisma/prisma';
+import { getRedisClient } from '../../data/redis/redis';
 import { SecurityEventType, EventSeverity } from '@prisma/client';
 
 export interface EnhancedSecurityEvent {
@@ -66,7 +66,7 @@ export class EnhancedSecurityMonitor {
       // Store in Redis for real-time monitoring (with expiration)
       const redisKey = `security_event:${event.ip}:${event.type}`;
       const eventData = JSON.stringify({ ...event, timestamp });
-      
+
       await this.redis.zadd(redisKey, timestamp, eventData);
       await this.redis.expire(redisKey, 3600); // Expire after 1 hour
 
@@ -102,13 +102,13 @@ export class EnhancedSecurityMonitor {
     try {
       const redisKey = `security_event:${event.ip}:${event.type}`;
       const windowStart = timestamp - this.ALERT_WINDOW;
-      
+
       // Count events in the time window
       const eventCount = await this.redis.zcount(redisKey, windowStart, timestamp);
-      
+
       if (eventCount >= this.ALERT_THRESHOLD) {
         await this.triggerAlert(event, eventCount);
-        
+
         // Auto-block for severe violations
         if (this.shouldAutoBlock(event.type, eventCount)) {
           await this.blockIP(event.ip, this.BLOCK_DURATION);
@@ -137,7 +137,7 @@ export class EnhancedSecurityMonitor {
    */
   private async triggerAlert(event: EnhancedSecurityEvent, eventCount: number): Promise<void> {
     const alertKey = `security_alert:${event.ip}:${event.type}`;
-    
+
     // Check if we've already alerted for this IP/type combination recently
     const existingAlert = await this.redis.get(alertKey);
     if (existingAlert) {
@@ -179,7 +179,7 @@ export class EnhancedSecurityMonitor {
     try {
       const blockKey = `blocked_ip:${ip}`;
       await this.redis.setex(blockKey, durationSeconds, '1');
-      
+
       // Log the block event
       await this.logSecurityEvent({
         type: SecurityEventType.IP_BLOCKED,
@@ -202,7 +202,7 @@ export class EnhancedSecurityMonitor {
     try {
       const blockKey = `blocked_ip:${ip}`;
       await this.redis.del(blockKey);
-      
+
       // Log the unblock event
       await this.logSecurityEvent({
         type: SecurityEventType.IP_UNBLOCKED,
@@ -237,7 +237,7 @@ export class EnhancedSecurityMonitor {
    */
   async detectSuspiciousActivity(req: NextRequest): Promise<boolean> {
     const { ip } = this.extractRequestInfo(req);
-    
+
     // Check if IP is blocked
     if (await this.isIPBlocked(ip)) {
       return true;
@@ -245,7 +245,7 @@ export class EnhancedSecurityMonitor {
 
     // Additional suspicious activity detection can be added here
     // For example: checking for unusual request patterns, known bad IPs, etc.
-    
+
     return false;
   }
 

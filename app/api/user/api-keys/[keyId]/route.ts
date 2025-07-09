@@ -1,8 +1,8 @@
 "use server";
 import { NextRequest } from "next/server";
-import { authService } from "@/lib/auth-service";
-import { userApiKeyService } from "@/lib/user-api-key-service";
-import { enhancedSecurityMiddleware } from "@/lib/enhanced-security-middleware";
+import { authService } from "@/core/services/auth-service";
+import { userApiKeyService } from "@/core/services/user-api-key-service";
+import { enhancedSecurityMiddleware } from "@/infrastructure/middleware/enhanced-security-middleware";
 
 export const OPTIONS = async () => {
   return enhancedSecurityMiddleware.handleCORS();
