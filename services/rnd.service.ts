@@ -10,19 +10,63 @@ interface HashOptions {
 
 const RND_SERVER_URL = process.env.RND_SERVER_URL;
 
-const getInitialString = async (): Promise<string> => {
+// Fallback pseudo-random generator
+const generateFallbackString = (): string => {
+  const timestamp = Date.now().toString();
+  const random = Math.random().toString(36).substring(2);
+  const crypto = require('crypto');
+  const randomBytes = crypto.randomBytes(32).toString('hex');
+  return `${timestamp}-${random}-${randomBytes}`;
+};
+
+// Health check for ESP32 server
+let esp32HealthStatus = { isHealthy: true, lastCheck: 0 };
+const HEALTH_CHECK_INTERVAL = 60000; // 1 minute
+
+const checkESP32Health = async (): Promise<boolean> => {
+  const now = Date.now();
+
+  // Only check health every minute
+  if (now - esp32HealthStatus.lastCheck < HEALTH_CHECK_INTERVAL) {
+    return esp32HealthStatus.isHealthy;
+  }
+
   if (!RND_SERVER_URL) {
-    throw new Error("RND_SERVER_URL environment variable is not set");
+    esp32HealthStatus = { isHealthy: false, lastCheck: now };
+    return false;
+  }
+
+  try {
+    const response = await axios.get(`${RND_SERVER_URL}/health`, { timeout: 5000 });
+    esp32HealthStatus = { isHealthy: response.status === 200, lastCheck: now };
+    return esp32HealthStatus.isHealthy;
+  } catch (error) {
+    console.warn("ESP32 health check failed:", error);
+    esp32HealthStatus = { isHealthy: false, lastCheck: now };
+    return false;
+  }
+};
+
+const getInitialString = async (): Promise<string> => {
+  // Check ESP32 health first
+  const isESP32Healthy = await checkESP32Health();
+
+  if (!isESP32Healthy || !RND_SERVER_URL) {
+    console.warn("ESP32 unavailable, using fallback pseudo-random generation");
+    return generateFallbackString();
   }
 
   try {
     const response = await axios.get<string>(
       `${RND_SERVER_URL}/get-random-string`,
+      { timeout: 10000 } // 10 second timeout
     );
     return response.data;
   } catch (error) {
-    console.error("Failed to fetch random string from server:", error);
-    throw new Error("Failed to fetch random string from server");
+    console.error("Failed to fetch random string from ESP32, using fallback:", error);
+    // Mark ESP32 as unhealthy for next check
+    esp32HealthStatus = { isHealthy: false, lastCheck: Date.now() };
+    return generateFallbackString();
   }
 };
 
@@ -34,6 +78,8 @@ const getHashBits = ({
   const hash = createHash("sha256").update(input).digest("hex");
   return parseInt(hash.slice(offset, offset + length), 16);
 };
+
+
 
 export const randomNumber = async (
   min: number,
@@ -94,6 +140,25 @@ export const randomString = async (
   let out = "";
   for (let i = 0; i < length; i++) {
     const bits = getHashBits({ input: input + i, offset: 0, length: 8 });
+    out += chars[bits % chars.length];
+  }
+  return out;
+};
+
+export const randomHex = async (length: number): Promise<string> => {
+  if (length < 0) {
+    throw new Error("Length cannot be negative");
+  }
+  if (length === 0) {
+    return "";
+  }
+
+  const input = await getInitialString();
+  let out = "";
+  const chars = "0123456789abcdef";
+
+  for (let i = 0; i < length; i++) {
+    const bits = getHashBits({ input: input + i, offset: 0, length: 4 });
     out += chars[bits % chars.length];
   }
   return out;

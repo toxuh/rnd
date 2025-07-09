@@ -18,6 +18,7 @@ services:
     environment:
       NODE_ENV: production
       REDIS_URL: redis://redis:6379
+      DATABASE_URL: postgresql://rnd_user:${POSTGRES_PASSWORD:-rnd_secure_password}@postgres:5432/rnd_db?schema=public
       # Security Configuration
       API_KEY_MAIN: ${API_KEY_MAIN:-rnd_prod_main_key_change_me}
       API_KEY_ADMIN: ${API_KEY_ADMIN:-rnd_prod_admin_key_change_me}
@@ -34,6 +35,9 @@ services:
       ENABLE_REQUEST_LOGGING: ${ENABLE_REQUEST_LOGGING:-true}
       # ESP32 Server
       RND_SERVER_URL: ${RND_SERVER_URL:-http://192.168.1.161}
+    depends_on:
+      - redis
+      - postgres
 
   redis:
     image: redis:7-alpine
@@ -44,5 +48,24 @@ services:
     volumes:
       - redis-data:/data
 
+  postgres:
+    image: postgres:16-alpine
+    container_name: postgres-app1
+    restart: unless-stopped
+    expose:
+      - "5432"
+    environment:
+      POSTGRES_DB: rnd_db
+      POSTGRES_USER: rnd_user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-rnd_secure_password}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rnd_user -d rnd_db"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
 volumes:
   redis-data:
+  postgres-data:

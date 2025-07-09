@@ -1,0 +1,185 @@
+// RND Application Database Schema
+// Hybrid architecture: PostgreSQL for persistent data, Redis for performance-critical operations
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User management and authentication
+model User {
+  id          String   @id @default(cuid())
+  email       String   @unique
+  name        String?
+  password    String   // Hashed password
+  role        UserRole @default(USER)
+  isActive    Boolean  @default(true)
+  isVerified  Boolean  @default(false)
+  verificationToken String?
+  resetToken  String?
+  resetTokenExpiry DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  lastLoginAt DateTime?
+
+  // Relations
+  apiKeys       ApiKey[]
+  usageRecords  UsageRecord[]
+  securityEvents SecurityEvent[]
+
+  @@map("users")
+}
+
+enum UserRole {
+  USER
+  ADMIN
+  SUPER_ADMIN
+}
+
+// Enhanced API Key management with metadata
+model ApiKey {
+  id          String     @id @default(cuid())
+  name        String     // Human-readable name
+  keyHash     String     @unique // SHA-256 hash of the actual key
+  keyPreview  String     // First 8 chars for display (e.g., "rnd_1234...")
+  permissions String[]   // Array of permissions like ["random:*", "admin:read"]
+  rateLimit   Int        @default(100) // Requests per minute (user default: 100)
+  isActive    Boolean    @default(true)
+  expiresAt   DateTime?  // Optional expiration
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  lastUsedAt  DateTime?
+
+  // Usage statistics
+  totalRequests Int      @default(0)
+  lastRequestAt DateTime?
+
+  // Relations
+  userId       String
+  user         User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  usageRecords UsageRecord[]
+  requestHistory RequestHistory[]
+
+  @@map("api_keys")
+}
+
+// API Key usage policies and limits
+model ApiKeyPolicy {
+  id                String   @id @default(cuid())
+  name              String   @unique
+  description       String?
+  maxKeysPerUser    Int      @default(5) // Max API keys per user
+  defaultRateLimit  Int      @default(100) // Default requests per minute
+  maxRateLimit      Int      @default(1000) // Maximum allowed rate limit
+  allowedEndpoints  String[] // Allowed endpoint patterns
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@map("api_key_policies")
+}
+
+// Persistent security audit trail
+model SecurityEvent {
+  id        String            @id @default(cuid())
+  type      SecurityEventType
+  ip        String
+  userAgent String?
+  endpoint  String
+  details   Json?             // Additional event-specific data
+  severity  EventSeverity     @default(LOW)
+  resolved  Boolean           @default(false)
+  createdAt DateTime          @default(now())
+
+  // Relations
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([ip, type, createdAt])
+  @@index([createdAt])
+  @@map("security_events")
+}
+
+enum SecurityEventType {
+  RATE_LIMIT_EXCEEDED
+  INVALID_API_KEY
+  SUSPICIOUS_REQUEST
+  BLOCKED_ORIGIN
+  LARGE_PAYLOAD
+  AUTHENTICATION_FAILURE
+  PERMISSION_DENIED
+  IP_BLOCKED
+  IP_UNBLOCKED
+}
+
+enum EventSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+// Usage analytics and reporting
+model UsageRecord {
+  id           String   @id @default(cuid())
+  endpoint     String   // e.g., "/api/rnd/number"
+  method       String   // HTTP method
+  statusCode   Int      // Response status
+  responseTime Int      // Response time in milliseconds
+  requestSize  Int?     // Request body size in bytes
+  responseSize Int?     // Response body size in bytes
+  ip           String
+  userAgent    String?
+  createdAt    DateTime @default(now())
+
+  // Relations
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+  apiKeyId String?
+  apiKey   ApiKey? @relation(fields: [apiKeyId], references: [id], onDelete: SetNull)
+
+  @@index([endpoint, createdAt])
+  @@index([apiKeyId, createdAt])
+  @@index([createdAt])
+  @@map("usage_records")
+}
+
+// Application configuration management
+model AppConfig {
+  id          String   @id @default(cuid())
+  key         String   @unique // Configuration key
+  value       String   // Configuration value (JSON string for complex values)
+  description String?  // Human-readable description
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("app_config")
+}
+
+// Request history for debugging and analytics (optional, can be heavy)
+model RequestHistory {
+  id           String   @id @default(cuid())
+  endpoint     String
+  method       String
+  headers      Json?    // Request headers
+  body         Json?    // Request body
+  response     Json?    // Response body
+  statusCode   Int
+  responseTime Int      // Response time in milliseconds
+  ip           String
+  userAgent    String?
+  createdAt    DateTime @default(now())
+
+  // Relations
+  apiKeyId String?
+  apiKey   ApiKey? @relation(fields: [apiKeyId], references: [id], onDelete: SetNull)
+
+  @@index([endpoint, createdAt])
+  @@index([createdAt])
+  @@map("request_history")
+}

@@ -2,41 +2,59 @@
 import axios from "axios";
 import { useMutation } from "@tanstack/react-query";
 
+// Create API client without default API key (will be added per request)
 const apiClient = axios.create({
   headers: {
-    "x-api-key": process.env.NEXT_PUBLIC_API_KEY,
     "Content-Type": "application/json",
   },
 });
 
-export interface RandomNumberRequest {
+// Helper function to create headers with optional API key
+const createHeaders = (apiKey?: string) => {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+
+  if (apiKey) {
+    headers["x-api-key"] = apiKey;
+  }
+
+  return headers;
+};
+
+// Base interface for all requests
+export interface BaseRequest {
+  apiKey?: string; // Optional API key for authenticated requests
+}
+
+export interface RandomNumberRequest extends BaseRequest {
   min: number;
   max: number;
 }
 
-export interface RandomFloatRequest {
+export interface RandomFloatRequest extends BaseRequest {
   min?: number;
   max?: number;
 }
 
-export interface RandomChoiceRequest<T = unknown> {
+export interface RandomChoiceRequest<T = unknown> extends BaseRequest {
   choices: T[];
 }
 
-export interface RandomStringRequest {
+export interface RandomStringRequest extends BaseRequest {
   length: number;
 }
 
-export interface RandomDateRequest {
+export interface RandomDateRequest extends BaseRequest {
   from: string | Date;
   to: string | Date;
 }
 
-export interface RandomShuffleRequest<T = unknown> {
+export interface RandomShuffleRequest<T = unknown> extends BaseRequest {
   choices: T[];
 }
 
-export interface RandomWeightedRequest<T = unknown> {
+export interface RandomWeightedRequest<T = unknown> extends BaseRequest {
   items: [T, number][];
 }
 
@@ -75,9 +93,17 @@ export interface RndErrorResponse {
 export const useFetchRnd = <T = unknown>() => {
   return useMutation<RndResponse<T>, Error, RndRequest>({
     mutationFn: async ({ type, params = {} }) => {
+      const { apiKey, ...requestParams } = params;
+
+      // Choose endpoint based on whether API key is provided
+      const endpoint = apiKey ? `/api/rnd/${type}` : `/api/public/rnd/${type}`;
+
       const response = await apiClient.post<RndResponse<T> | RndErrorResponse>(
-        `/api/rnd/${type}`,
-        params,
+        endpoint,
+        requestParams,
+        {
+          headers: createHeaders(apiKey),
+        }
       );
 
       if ("error" in response.data) {
@@ -92,9 +118,14 @@ export const useFetchRnd = <T = unknown>() => {
 export const useFetchRandomNumber = () => {
   return useMutation<number, Error, RandomNumberRequest>({
     mutationFn: async (params) => {
+      const { apiKey, ...requestParams } = params;
+      const endpoint = apiKey ? "/api/rnd/number" : "/api/public/rnd/number";
+
       const response = await apiClient.post<
         RndResponse<number> | RndErrorResponse
-      >("/api/rnd/number", params);
+      >(endpoint, requestParams, {
+        headers: createHeaders(apiKey),
+      });
 
       if ("error" in response.data) {
         throw new Error(response.data.error);
@@ -106,11 +137,16 @@ export const useFetchRandomNumber = () => {
 };
 
 export const useFetchRandomBoolean = () => {
-  return useMutation<boolean, Error, void>({
-    mutationFn: async () => {
+  return useMutation<boolean, Error, BaseRequest>({
+    mutationFn: async (params = {}) => {
+      const { apiKey } = params;
+      const endpoint = apiKey ? "/api/rnd/boolean" : "/api/public/rnd/boolean";
+
       const response = await apiClient.post<
         RndResponse<boolean> | RndErrorResponse
-      >("/api/rnd/boolean", {});
+      >(endpoint, {}, {
+        headers: createHeaders(apiKey),
+      });
 
       if ("error" in response.data) {
         throw new Error(response.data.error);

@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useFetchRnd, type RndRequestType } from "@/hooks/rnd/useFetchRnd";
+import { AuthButton } from "@/components/auth/auth-modal";
 
 const RND_TYPES = [
   "number",
@@ -216,6 +217,7 @@ const Page = () => {
   return (
     <main className="min-h-screen bg-background">
       <div className="absolute top-4 right-4 flex gap-2 z-10">
+        <AuthButton />
         <Button
           variant="outline"
           size="icon"
@@ -240,8 +242,10 @@ const Page = () => {
         </Button>
       </div>
 
-      <div className="min-h-screen flex items-center justify-center p-4 font-montserrat">
-        <Card className="w-full max-w-lg shadow-lg">
+      <div className="min-h-screen p-4 font-montserrat">
+        <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-6 py-8">
+          {/* Random Generator */}
+          <Card className="shadow-lg">
           <CardHeader className="text-center">
             <CardTitle className="text-2xl font-bold">
               True Random Generator
@@ -418,6 +422,25 @@ const Page = () => {
             </div>
           </CardContent>
         </Card>
+
+        {/* User Dashboard Link */}
+        <div className="mt-6">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-center">
+                <p className="text-muted-foreground mb-4">
+                  Want to manage API keys and view analytics?
+                </p>
+                <Button asChild>
+                  <Link href="/dashboard">
+                    Go to Dashboard
+                  </Link>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
       </div>
     </main>
   );

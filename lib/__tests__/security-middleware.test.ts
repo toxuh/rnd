@@ -49,7 +49,7 @@ describe('SecurityMiddleware', () => {
   });
 
   const createMockRequest = (url: string, options: RequestInit = {}) => {
-    return new NextRequest(new Request(`http://localhost${url}`, {
+    return new NextRequest(`http://localhost${url}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -57,7 +57,7 @@ describe('SecurityMiddleware', () => {
         ...options.headers,
       },
       ...options,
-    }));
+    });
   };
 
   describe('validateRequest', () => {

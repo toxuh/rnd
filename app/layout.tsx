@@ -4,6 +4,8 @@ import "./globals.css";
 
 import { ThemeProvider } from "./theme-provider";
 import { QCP } from "./query-client-provider";
+import { AuthProvider } from "@/contexts/auth-context";
+import { ToastProvider } from "@/components/ui/toast";
 
 const font = Montserrat({
   subsets: ["latin"],
@@ -23,7 +25,13 @@ const RootLayout = ({ children }: { children: React.ReactNode }) => (
         enableSystem
         disableTransitionOnChange
       >
-        <QCP>{children}</QCP>
+        <QCP>
+          <AuthProvider>
+            <ToastProvider>
+              {children}
+            </ToastProvider>
+          </AuthProvider>
+        </QCP>
       </ThemeProvider>
     </body>
   </html>
